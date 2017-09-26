@@ -1,0 +1,273 @@
+# Validation
+apiVersion: v1
+kind: Service
+metadata:
+  name: validation
+  labels:
+    group: validation
+spec:
+  selector:
+    group: validation
+  ports:
+  - name: p2p
+    port: 46656
+  - name: rpc
+    port: 46657
+  clusterIP: None
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx
+data:
+  pub_key_nginx.conf: |-
+    server {
+      listen 80 default_server;
+      listen [::]:80 default_server ipv6only=on;
+      location /pub_key.json { root /usr/share/nginx/; }
+    }
+---
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: validator
+  labels:
+    group: validation
+spec:
+  serviceName: validation
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        group: validation
+    spec:
+      initContainers:
+      - name: copy-files
+        image: {{input "filetmpopImage"}}
+        command:
+        - sh
+        - "-c"
+        - |
+          set -ex
+          cp -f /provision/tendermint/public/* /tendermint
+          cp -f /provision/tendermint/private/* /tendermint
+          chown -R 999:999 /tendermint
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - name: tendermint
+          mountPath: /tendermint
+        - name: tendermint-public
+          mountPath: /provision/tendermint/public
+          readOnly: true
+        - name: tendermint-private
+          mountPath: /provision/tendermint/private
+          readOnly: true
+      containers:
+      - name: filetmpop
+        image: {{input "filetmpopImage"}}
+        command:
+        - sh
+        - "-c"
+        - |
+          set -ex
+          validators=$(cat /tendermint/validators)
+          seeds=""
+          for peer in ${validators}; do
+            seeds="${peer}:46656,"
+            set +e
+            wget http://${peer}/pub_key.json -T 10 -q -O - > /dev/null
+            error=$?
+            while [ "$error" != 0 ]; do
+              sleep 5
+              echo Checking peer ${peer}...
+              wget http://${peer}/pub_key.json -T 10 -q -O - > /dev/null
+              error=$?
+            done
+            set -e
+          done
+          filetmpop -home=/tendermint -path=/tendermint/segments -rules_filename=/tendermint/rules.json -seeds=${seeds%?}
+        ports:
+        - name: p2p
+          containerPort: 46656
+        - name: rpc
+          containerPort: 46657
+        volumeMounts:
+        - name: tendermint
+          mountPath: /tendermint
+      - name: nginx
+        image: nginx:1.11.9
+        ports:
+        - containerPort: 80
+          name: http
+        command:
+        - bash
+        - "-c"
+        - |
+          set -ex
+          mkdir -p /usr/share/nginx
+          cp /tendermint/pub_key.json /usr/share/nginx/pub_key.json
+          nginx -g "daemon off;"
+        volumeMounts:
+        - name: tendermint
+          mountPath: /tendermint
+        - name: nginx-conf
+          mountPath: /etc/nginx/conf.d/pub_key.conf
+          subPath: pub_key_nginx.conf
+      volumes:
+      - name: tendermint-public
+        configMap:
+          name: tendermint
+      - name: tendermint-private
+        secret:
+          secretName: tendermint
+          defaultMode: 256
+      - name: nginx-conf
+        configMap:
+          name: nginx
+      restartPolicy: Always
+  volumeClaimTemplates:
+  - metadata:
+      name: tendermint
+      labels:
+        group: validation
+      annotations:
+        volume.alpha.kubernetes.io/storage-class: any
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 100Mi
+{{- if eq (input "deployStore") "y" }}
+---
+# Store
+apiVersion: v1
+kind: Service
+metadata:
+  name: store
+  labels:
+    group: store
+spec:
+  selector:
+    group: store
+  ports:
+  - name: http
+    port: 5000
+    nodePort: 5000
+  type: NodePort
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: store
+  labels:
+    group: store
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: store
+      labels:
+        group: store
+    spec:
+      containers:
+      - name: tmstore
+        image: {{input "tmstoreImage"}}
+        env:
+        - name: END_POINT
+          value: tcp://validator-0.validation.{{input "kubernetesNamespace"}}.svc.{{input "kubernetesDomain"}}:46657
+        command:
+        - sh
+        - "-c"
+        - |
+          set -ex
+          tmstore -endpoint=$END_POINT
+        ports:
+        - name: http
+          containerPort: 5000
+      restartPolicy: Always
+{{- if eq (input "deployAgent") "y" }}
+---
+# Agent
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent
+  labels:
+    group: agent
+spec:
+  selector:
+    group: agent
+  ports:
+  - name: http
+    port: 3000
+    nodePort: 3000
+  type: NodePort
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: agent
+  labels:
+    group: agent
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: agent
+      labels:
+        group: agent
+    spec:
+      containers:
+      - name: agent
+        image: {{input "agentImage"}}
+        env:
+        - name: STRATUMN_SALT
+          value: '&#Kl<CJw-^.Yi4,ic]7#<2RbPud%GSknvm4uZ>Jh)$Hu]cA8tA&/7aZp~jrXC8x)'
+        ports:
+          - name: http
+            containerPort: 3000
+      restartPolicy: Always
+{{- if eq (input "deployAgentUI") "y" }}
+---
+# Agent UI
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-ui
+  labels:
+    group: agent-ui
+spec:
+  selector:
+    group: agent-ui
+  ports:
+  - name: http
+    port: 4000
+    nodePort: 4000
+  type: NodePort
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: agent-ui
+  labels:
+    group: agent-ui
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: agent-ui
+      labels:
+        group: agent-ui
+    spec:
+      containers:
+      - name: agent-ui
+        image: {{input "agentUIImage"}}
+        ports:
+          - name: http
+            containerPort: 5000
+      restartPolicy: Always
+{{- end}}
+{{- end}}
+{{- end}}

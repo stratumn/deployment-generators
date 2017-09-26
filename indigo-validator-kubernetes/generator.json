@@ -1,0 +1,93 @@
+{
+  "name": "indigo-validator-kubernetes",
+  "version": "0.1.0",
+  "description": "Deploy an Indigo validator to Kubernetes",
+  "author": "Stratumn",
+  "license": "Apache-2.0",
+  "inputs": {
+    "filetmpopImage": {
+      "type": "string",
+      "prompt": "File Tendermint POP image:",
+      "default": "stratumn/filetmpop:0.1.0-dev",
+      "format": ".+"
+    },
+    "tmstoreImage": {
+      "type": "string",
+      "prompt": "Tendermint Store image:",
+      "default": "stratumn/tmstore:0.1.0-dev",
+      "format": ".+"
+    },
+    "agentImage": {
+      "type": "string",
+      "prompt": "Agent image:",
+      "default": "stratumn/indigo-kube-agent-js",
+      "format": ".+"
+    },
+    "agentUIImage": {
+      "type": "string",
+      "prompt": "Agent UI image:",
+      "default": "stratumn/agent-ui:v0.3.1",
+      "format": ".+"
+    },
+    "tendermintImage": {
+      "type": "string",
+      "prompt": "Tendermint image (for generating keys):",
+      "default": "tendermint/tendermint:0.10.0",
+      "format": ".+"
+    },
+    "deployStore": {
+      "type": "select:string",
+      "prompt": "Deploy a store",
+      "default": "y",
+      "options": [{
+        "input": "y",
+        "value": "y",
+        "text": "Yes"
+      }, {
+        "input": "n",
+        "value": "n",
+        "text": "No"
+      }]
+    },
+    "deployAgent": {
+      "type": "select:string",
+      "prompt": "Deploy an agent",
+      "default": "y",
+      "options": [{
+        "input": "y",
+        "value": "y",
+        "text": "Yes"
+      }, {
+        "input": "n",
+        "value": "n",
+        "text": "No"
+      }]
+    },
+    "deployAgentUI": {
+      "type": "select:string",
+      "prompt": "Deploy agent UI",
+      "default": "y",
+      "options": [{
+        "input": "y",
+        "value": "y",
+        "text": "Yes"
+      }, {
+        "input": "n",
+        "value": "n",
+        "text": "No"
+      }]
+    },
+    "kubernetesNamespace": {
+      "type": "string",
+      "prompt": "Kubernetes namespace:",
+      "default": "default",
+      "format": ".+"
+    },
+    "kubernetesDomain": {
+      "type": "string",
+      "prompt": "Kubernetes domain:",
+      "default": "cluster.local",
+      "format": ".+"
+    }
+  }
+}

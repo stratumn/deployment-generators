@@ -72,7 +72,7 @@ The next step is to gather the public key of each validator. Put all the public 
 
 ```bash
 mkdir tendermint/validators
-cp cp tendermint/public/pub_key.json tendermint/validators/pub_key_alice.json
+cp tendermint/public/pub_key.json tendermint/validators/pub_key_alice.json
 # Copy all the other public keys as well.
 
 ./utils/gen_genesis.sh tendermint/validators/*.json > tendermint/public/genesis.json

@@ -88,6 +88,12 @@
       "prompt": "Kubernetes domain:",
       "default": "cluster.local",
       "format": ".+"
+    },
+    "environment": {
+      "type": "string",
+      "prompt": "Environment:",
+      "default": "production",
+      "format": ".+"
     }
   }
 }

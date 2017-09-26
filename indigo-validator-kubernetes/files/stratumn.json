@@ -1,6 +1,6 @@
 {
   "scripts": {
     "init": "echo IMPORTANT: see README.md for instructions on how to deploy the validator.",
-    "deploy": "kubectl apply -n {{input `kubernetesNamespace`}} -f validator.yml"
+    "deploy:{{input `environment`}}": "kubectl apply -n {{input `kubernetesNamespace`}} -f validator.yml"
   }
 }
